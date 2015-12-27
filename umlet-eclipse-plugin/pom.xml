@@ -131,4 +131,39 @@
 			</plugin>
 		</plugins>
 	</build>
+	<profiles>
+		<profile>
+			<id>release</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>com.github.github</groupId>
+						<artifactId>site-maven-plugin</artifactId>
+						<version>0.12</version>
+						<configuration>
+							<message>Creating site for ${project.version}</message>
+							<branch>refs/heads/plugin</branch>
+							<userName>ruediste-travis</userName>
+							<oauth2Token>${env.GITHUB_OAUTH2}</oauth2Token>
+							<repositoryOwner>ruediste-travis</repositoryOwner>
+							<repositoryName>umlet_upload</repositoryName>
+							<outputDirectory>${project.build.directory}</outputDirectory>
+							<includes>
+								<include>${project.build.finalName}.jar</include>
+							</includes>
+							<force>true</force>
+						</configuration>
+						<executions>
+							<execution>
+								<goals>
+									<goal>site</goal>
+								</goals>
+								<phase>deploy</phase>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>
