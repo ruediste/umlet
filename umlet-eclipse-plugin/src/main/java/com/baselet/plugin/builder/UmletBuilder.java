@@ -224,9 +224,11 @@ public class UmletBuilder extends IncrementalProjectBuilder {
 					throw (OperationCanceledException) e.getCause();
 				}
 				try {
-					IMarker marker = inFile.createMarker(PROBLEM_MARKER_TYPE);
-					marker.setAttribute(IMarker.MESSAGE, "Error while exporting Umlet diagram: " + e.getCause().getMessage());
-					marker.setAttribute(IMarker.SEVERITY, IMarker.SEVERITY_ERROR);
+					if (inFile.exists()) {
+						IMarker marker = inFile.createMarker(PROBLEM_MARKER_TYPE);
+						marker.setAttribute(IMarker.MESSAGE, "Error while exporting Umlet diagram: " + e.getCause().getMessage());
+						marker.setAttribute(IMarker.SEVERITY, IMarker.SEVERITY_ERROR);
+					}
 				} catch (CoreException e1) {
 					throw new RuntimeException(e1);
 				}
