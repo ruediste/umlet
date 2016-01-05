@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin>
+	<extension point="org.eclipse.ui.newWizards">
+		<wizard name="Umlet diagram" id="com.umlet.plugin.wizards.NewWizard"
+			icon="img/umlet_eclipse.gif" category="com.baselet.plugin"
+			class="com.baselet.plugin.wizard.NewWizard" />
+	</extension>
+	<extension point="org.eclipse.ui.editors">
+		<editor name="Umlet Editor" id="com.umlet.plugin.Editor" icon="img/umlet_eclipse.gif"
+			class="com.baselet.plugin.gui.Editor" contributorClass="com.baselet.plugin.gui.Contributor"
+			extensions="uxf" default="false" />
+	</extension>
+	<extension id="builder" name="Umlet Builder"
+		point="org.eclipse.core.resources.builders">
+		<builder>
+			<run class="com.baselet.plugin.builder.UmletBuilder" />
+		</builder>
+	</extension>
+
+	<extension id="com.umlet.keywords" point="org.eclipse.ui.keywords">
+		<keyword id="com.umlet.keywords.umlet" label="Umlet" />
+	</extension>
+	<extension point="org.eclipse.ui.propertyPages">
+		<page id="com.umlet.projectPropertyPage" name="Umlet"
+			class="com.baselet.plugin.builder.ProjectPropertyPage">
+			<keywordReference id="com.umlet.keywords.umlet" />
+			<enabledWhen>
+				<adapt type="org.eclipse.core.resources.IProject" />
+			</enabledWhen>
+		</page>
+	</extension>
+
+	<extension point="org.eclipse.ui.commands">
+		<command defaultHandler="com.baselet.plugin.builder.AddBuilder"
+			id="com.umlet.builder.addBuilder" name="Add Umlet Builder">
+		</command>
+		<command defaultHandler="com.baselet.plugin.builder.RemoveBuilder"
+			id="com.umlet.builder.removeBuilder" name="Remove Umlet Builder">
+		</command>
+	</extension>
+
+	<extension point="org.eclipse.ui.menus">
+		<menuContribution allPopups="false"
+			locationURI="popup:org.eclipse.ui.projectConfigure?after=additions">
+			<command commandId="com.umlet.builder.addBuilder" style="push">
+				<visibleWhen checkEnabled="false">
+					<and>
+						<count value="1">
+						</count>
+						<iterate ifEmpty="false" operator="and">
+							<adapt type="org.eclipse.core.resources.IProject">
+							</adapt>
+						</iterate>
+						<iterate>
+							<not>
+								<test forcePluginActivation="true" property="com.umlet.builder.isEnabled">
+								</test>
+							</not>
+						</iterate>
+					</and>
+				</visibleWhen>
+			</command>
+			<command commandId="com.umlet.builder.removeBuilder" style="push">
+				<visibleWhen checkEnabled="false">
+					<and>
+						<count value="1">
+						</count>
+						<iterate ifEmpty="false" operator="and">
+							<adapt type="org.eclipse.core.resources.IProject">
+							</adapt>
+						</iterate>
+						<iterate>
+							<test forcePluginActivation="true" property="com.umlet.builder.isEnabled">
+							</test>
+						</iterate>
+					</and>
+				</visibleWhen>
+			</command>
+		</menuContribution>
+	</extension>
+	<extension point="org.eclipse.core.expressions.propertyTesters">
+		<propertyTester class="com.baselet.plugin.builder.TestBuilderEnabled"
+			id="com.umlet.builder.builderPresent" namespace="com.umlet.builder"
+			properties="isEnabled" type="java.lang.Object">
+		</propertyTester>
+	</extension>
+
+	<extension id="builderProblem" point="org.eclipse.core.resources.markers">
+		<super type="org.eclipse.core.resources.problemmarker" />
+		<persistent value="true" />
+	</extension>
+
+	<extension point="org.eclipse.jdt.ui.javaCompletionProposalComputer"
+		id="umlet_proposals" name="Umlet Proposals">
+		<proposalCategory />
+	</extension>
+
+	<extension point="org.eclipse.jdt.ui.javaCompletionProposalComputer"
+		id="javadocCompletion" name="Umlet Javadoc Completion">
+		<javaCompletionProposalComputer
+			activate="true" class="com.baselet.plugin.contentAssist.ImgRefProposalComputer"
+			categoryId="com.umlet.plugin.umlet_proposals">
+			<partition type="__java_javadoc" />
+		</javaCompletionProposalComputer>
+	</extension>
+
+	<action definitionId="org.eclipse.jdt.ui.edit.text.java.move.element"
+		label="%Refactoring.moveAction.label" retarget="true"
+		menubarPath="org.eclipse.jdt.ui.refactoring.menu/reorgGroup" id="org.eclipse.jdt.ui.actions.Move">
+	</action>
+</plugin>

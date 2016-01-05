@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+	xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>com.umlet</groupId>
@@ -21,9 +23,10 @@
 			<layout>p2</layout>
 		</repository>
 	</repositories>
-
+	
 	<build>
 		<plugins>
+
 			<plugin>
 				<artifactId>maven-dependency-plugin</artifactId>
 				<executions>
@@ -92,8 +95,10 @@
 						<configuration>
 							<target>
 								<loadfile property="bundle.classpath" srcFile="${project.basedir}/classPath.txt" />
-								<echo message="Updating MANIFEST Bundle-ClassPath to: ${bundle.classpath}" />
-								<manifest file="${project.build.directory}/../META-INF/MANIFEST.MF" mode="update">
+								<echo
+									message="Updating MANIFEST Bundle-ClassPath to: ${bundle.classpath}" />
+								<manifest file="${project.build.directory}/../META-INF/MANIFEST.MF"
+									mode="update">
 									<attribute name="Bundle-ClassPath" value=".,${bundle.classpath}" />
 								</manifest>
 								<delete file="${project.basedir}/classPath.txt" />
@@ -101,7 +106,8 @@
 							</target>
 						</configuration>
 					</execution>
-					<!-- move umlet-elements and umlet-swing to target/classes (because in Eclipse they are source dirs, the jars are only necessary for the build) -->
+					<!-- move umlet-elements and umlet-swing to target/classes (because 
+						in Eclipse they are source dirs, the jars are only necessary for the build) -->
 					<execution>
 						<id>move-umlet-jars</id>
 						<phase>process-resources</phase>
@@ -110,7 +116,8 @@
 						</goals>
 						<configuration>
 							<target>
-								<move file="${project.basedir}/lib/umlet-elements.jar" todir="${project.build.outputDirectory}/lib" />
+								<move file="${project.basedir}/lib/umlet-elements.jar"
+									todir="${project.build.outputDirectory}/lib" />
 								<move file="${project.basedir}/lib/umlet-swing.jar" todir="${project.build.outputDirectory}/lib" />
 								<echo message="Moved jar files of linked src folders to ${project.build.outputDirectory}/lib" />
 							</target>

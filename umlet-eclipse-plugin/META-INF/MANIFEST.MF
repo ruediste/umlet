@@ -23,7 +23,8 @@ Require-Bundle: org.eclipse.ui,
  org.eclipse.jface,
  org.eclipse.jface.text;resolution:=optional,
  org.eclipse.jdt.core;resolution:=optional,
- org.eclipse.jdt.ui;resolution:=optional
+ org.eclipse.jdt.ui;resolution:=optional,
+ org.eclipse.ui.workbench.texteditor
 Bundle-ActivationPolicy: lazy
 Eclipse-LazyStart: true
 Import-Package: org.eclipse.core.filesystem
