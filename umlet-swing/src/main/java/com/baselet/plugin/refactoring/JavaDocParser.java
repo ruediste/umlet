@@ -188,6 +188,10 @@ public class JavaDocParser {
 			return getAttr(key) != null;
 		}
 
+		public int length() {
+			return end-start;
+		}
+
 	}
 
 	/**

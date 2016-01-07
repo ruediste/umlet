@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IResourceVisitor;
@@ -13,7 +12,6 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.jdt.core.IJavaElement;
-import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.ISourceRange;
@@ -24,10 +22,12 @@ import org.eclipse.jdt.ui.text.java.JavaContentAssistInvocationContext;
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.IDocument;
 import org.eclipse.jface.text.contentassist.ICompletionProposal;
+import org.eclipse.jface.text.contentassist.ICompletionProposalExtension4;
 import org.eclipse.jface.text.contentassist.IContextInformation;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
 
+import com.baselet.plugin.UmletPluginUtils;
 import com.baselet.plugin.refactoring.JavaDocParser;
 import com.baselet.plugin.refactoring.JavaDocParser.HtmlTagAttr;
 import com.baselet.plugin.refactoring.JavaDocParser.HtmlTagStartNode;
@@ -42,12 +42,13 @@ public class ImgRefProposalComputer implements IJavaCompletionProposalComputer {
 	 * Proposal to insert a link to an image
 	 *
 	 */
-	private static class ReplacementProposal implements ICompletionProposal {
+	private static class ReplacementProposal implements ICompletionProposal, ICompletionProposalExtension4 {
 
 		private final int replacementOffset;
 		private final int replacementLength;
 		private final String displayString;
 		private final String replacementString;
+		private boolean autoInsertable = true;
 
 		public ReplacementProposal(String displayString, String replacementString, int replacementOffset, int replacementLength) {
 			this.displayString = displayString;
@@ -89,6 +90,16 @@ public class ImgRefProposalComputer implements IJavaCompletionProposalComputer {
 		public IContextInformation getContextInformation() {
 			return null;
 		}
+
+		@Override
+		public boolean isAutoInsertable() {
+			return autoInsertable;
+		}
+
+		public ReplacementProposal setAutoInsertable(boolean autoInsertable) {
+			this.autoInsertable = autoInsertable;
+			return this;
+		}
 	}
 
 	@Override
@@ -101,14 +112,7 @@ public class ImgRefProposalComputer implements IJavaCompletionProposalComputer {
 			try {
 				IDocument document = context.getDocument();
 				if (document != null) {
-					int offset = context.getInvocationOffset();
-					String content = document.get();
-
-					collectTransformProposals(javaContext, proposals, content);
-
-					int lastSpaceIndex = content.lastIndexOf(' ', offset) + 1;
-					String prefix = content.substring(lastSpaceIndex, offset);
-					collectImageLinkProposals(javaContext, proposals, prefix, lastSpaceIndex, offset - lastSpaceIndex);
+					computeCompleteionProposals(javaContext, document, proposals);
 				}
 			} catch (Exception e) {
 				throw new RuntimeException(e);
@@ -117,7 +121,8 @@ public class ImgRefProposalComputer implements IJavaCompletionProposalComputer {
 		return proposals;
 	}
 
-	private boolean collectTransformProposals(JavaContentAssistInvocationContext javaContext, ArrayList<ICompletionProposal> proposals, String content) throws JavaModelException {
+	private void computeCompleteionProposals(JavaContentAssistInvocationContext javaContext, IDocument document, ArrayList<ICompletionProposal> proposals) throws CoreException {
+		String content = document.get();
 		int offset = javaContext.getInvocationOffset();
 
 		// try to get the javadoc of the element at the offset
@@ -125,63 +130,80 @@ public class ImgRefProposalComputer implements IJavaCompletionProposalComputer {
 		if (elementAt instanceof IMember) {
 			ISourceRange range = ((IMember) elementAt).getJavadocRange();
 			if (range != null) {
+				// parse javadoc
 				JavaDocCommentNode comment = new JavaDocParser(content, range.getOffset(), range.getOffset() + range.getLength()).comment();
 
+				boolean addPrefixProposals = true;
 				// search the html tags
 				for (JavaDocNodeBase child : comment.children) {
 					if (child instanceof HtmlTagStartNode) {
 						HtmlTagStartNode tag = (HtmlTagStartNode) child;
 						if (tag.start <= offset && offset < tag.end) {
+							// no prefix proposals within start tags
+							addPrefixProposals = false;
 							if ("img".equals(tag.tagName.getValue())) {
 								HtmlTagAttr srcAttr = tag.getAttr("src");
 								if (srcAttr != null) {
-									// we've found an img tag with a src attribute
-									final IPath javaResourceParentPath = getJavaResourceParentPath(javaContext);
-									if (javaResourceParentPath == null) {
-										break;
+									addTransformProposals(javaContext, proposals, srcAttr);
+									if (srcAttr.value.start <= offset && offset <= srcAttr.value.end) {
+										collectSrcAttrLinkToResources(javaContext, proposals, srcAttr);
 									}
-
-									String src = srcAttr.value.getValue();
-									if (src.startsWith("{@docRoot}")) {
-										// propose to transform to relative
-										Path path = new Path(src.substring("{@docRoot}".length()));
-										String replacement = path.makeRelativeTo(javaResourceParentPath).toString();
-										proposals.add(new ReplacementProposal("Transform src to " + replacement, replacement, srcAttr.value.start, srcAttr.value.length()));
-									}
-									else {
-										// propose to transform to absolute
-										String replacement = "{@docRoot}/" + javaResourceParentPath.append(src).toString();
-										proposals.add(new ReplacementProposal("Transform src to " + replacement, replacement, srcAttr.value.start, srcAttr.value.length()));
-									}
-									break;
 								}
 							}
-							return true;
+							break;
 						}
 					}
 				}
+
+				if (addPrefixProposals) {
+					int lastSpaceIndex = content.lastIndexOf(' ', offset - 1) + 1;
+					String prefix = content.substring(lastSpaceIndex, offset);
+					collectImageLinkProposals(javaContext, proposals, prefix, lastSpaceIndex, offset - lastSpaceIndex);
+				}
 			}
 		}
-		return false;
 	}
 
-	private IPath getJavaResourceParentPath(JavaContentAssistInvocationContext context) throws JavaModelException {
-		IResource javaResource = context.getCompilationUnit().getResource();
-		if (javaResource == null) {
-			return null;
+	private void collectSrcAttrLinkToResources(JavaContentAssistInvocationContext javaContext, ArrayList<ICompletionProposal> proposals, HtmlTagAttr srcAttr) throws CoreException {
+		String src = srcAttr.value.getValue();
+		// add proposals for resource links
+		{
+			int prefixStart = src.lastIndexOf('/') + 1;
+			int prefixEnd = javaContext.getInvocationOffset() - srcAttr.value.start;
+			if (prefixEnd >= 0 && prefixStart < prefixEnd && prefixEnd <= src.length()) {
+				String prefix = src.substring(prefixStart, prefixEnd);
+				for (String path : collectResourcePaths(javaContext, prefix)) {
+					proposals.add(new ReplacementProposal("Change link to " + path, path, srcAttr.value.start, srcAttr.value.length()));
+				}
+			}
 		}
-		final IContainer parent = javaResource.getParent();
-		if (parent == null) {
-			return null;
-		}
-
-		return getPackageFragmentRootRelativePath(context.getProject(), parent.getProjectRelativePath());
 	}
 
-	private void collectImageLinkProposals(final JavaContentAssistInvocationContext context, final ArrayList<ICompletionProposal> proposals, final String prefix, final int inputOffset, final int inputLength) throws CoreException {
-		final IPath javaResourceParentPath = getJavaResourceParentPath(context);
+	private void addTransformProposals(JavaContentAssistInvocationContext javaContext, ArrayList<ICompletionProposal> proposals, HtmlTagAttr srcAttr) throws JavaModelException {
+		final IPath javaResourceParentPath = UmletPluginUtils.getJavaResourceParentPath(javaContext.getCompilationUnit());
 		if (javaResourceParentPath == null) {
 			return;
+		}
+
+		String src = srcAttr.value.getValue();
+		if (UmletPluginUtils.isAbsoluteImageRef(src)) {
+			// propose to transform to relative
+			Path path = new Path(src.substring("{@docRoot}".length()));
+			String replacement = path.makeRelativeTo(javaResourceParentPath).toString();
+			proposals.add(new ReplacementProposal("Transform src to " + replacement, replacement, srcAttr.value.start, srcAttr.value.length()).setAutoInsertable(false));
+		}
+		else {
+			// propose to transform to absolute
+			String replacement = "{@docRoot}/" + javaResourceParentPath.append(src).toString();
+			proposals.add(new ReplacementProposal("Transform src to " + replacement, replacement, srcAttr.value.start, srcAttr.value.length()).setAutoInsertable(false));
+		}
+	}
+
+	private List<String> collectResourcePaths(final JavaContentAssistInvocationContext context, final String prefix) throws CoreException {
+		final ArrayList<String> result = new ArrayList<String>();
+		final IPath javaResourceParentPath = UmletPluginUtils.getJavaResourceParentPath(context.getCompilationUnit());
+		if (javaResourceParentPath == null) {
+			return result;
 		}
 
 		// search all source folders of the current project for images
@@ -205,32 +227,27 @@ public class ImgRefProposalComputer implements IJavaCompletionProposalComputer {
 							while (parentCount < relativePath.segmentCount() && "..".equals(relativePath.segment(parentCount))) {
 								parentCount++;
 							}
+							String path;
 							if (parentCount > 1) {
-								String path = "{@docRoot}/" + imagePath;
-								proposals.add(new ReplacementProposal("Link to " + path, "<img src=\"" + path + "\" alt=\"\">", inputOffset, inputLength));
+								path = "{@docRoot}/" + imagePath;
 							}
 							else {
-								String path = relativePath.toString();
-								proposals.add(new ReplacementProposal("Link to " + path, "<img src=\"" + path + "\" alt=\"\">", inputOffset, inputLength));
+								path = relativePath.toString();
 							}
+							result.add(path);
 						}
 					}
 					return true;
 				}
 			});
 		}
+		return result;
 	}
 
-	private IPath getPackageFragmentRootRelativePath(IJavaProject project, IPath path) throws JavaModelException {
-		for (IPackageFragmentRoot root : project.getAllPackageFragmentRoots()) {
-			IResource rootResource = root.getResource();
-			if (rootResource != null) {
-				if (rootResource.getProjectRelativePath().isPrefixOf(path)) {
-					return path.makeRelativeTo(rootResource.getProjectRelativePath());
-				}
-			}
+	private void collectImageLinkProposals(final JavaContentAssistInvocationContext context, final ArrayList<ICompletionProposal> proposals, final String prefix, final int inputOffset, final int inputLength) throws CoreException {
+		for (String path : collectResourcePaths(context, prefix)) {
+			proposals.add(new ReplacementProposal("Link to " + path, "<img src=\"" + path + "\" alt=\"\">", inputOffset, inputLength));
 		}
-		return path;
 	}
 
 	@Override
