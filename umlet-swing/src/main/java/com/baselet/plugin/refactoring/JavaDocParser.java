@@ -29,6 +29,15 @@ public class JavaDocParser {
 
 	public static class JavaDocCommentNode extends JavaDocNodeBase {
 		public List<JavaDocNodeBase> children = new ArrayList<JavaDocNodeBase>();
+
+		public <T extends JavaDocNodeBase> List<T> ofType(Class<T> clazz) {
+			ArrayList<T> result = new ArrayList<T>();
+			for (JavaDocNodeBase child : children) {
+				if (clazz.isInstance(child))
+					result.add(clazz.cast(child));
+			}
+			return result;
+		}
 	}
 
 	public static class HtmlTagAttr {
@@ -189,7 +198,7 @@ public class JavaDocParser {
 		}
 
 		public int length() {
-			return end-start;
+			return end - start;
 		}
 
 	}

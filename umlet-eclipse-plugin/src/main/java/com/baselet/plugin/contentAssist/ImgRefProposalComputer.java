@@ -7,13 +7,14 @@ import java.util.List;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IResourceVisitor;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.Path;
+import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMember;
-import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.ui.text.java.ContentAssistInvocationContext;
@@ -112,7 +113,7 @@ public class ImgRefProposalComputer implements IJavaCompletionProposalComputer {
 			try {
 				IDocument document = context.getDocument();
 				if (document != null) {
-					computeCompleteionProposals(javaContext, document, proposals);
+					computeCompletionProposals(javaContext, document, proposals);
 				}
 			} catch (Exception e) {
 				throw new RuntimeException(e);
@@ -121,7 +122,7 @@ public class ImgRefProposalComputer implements IJavaCompletionProposalComputer {
 		return proposals;
 	}
 
-	private void computeCompleteionProposals(JavaContentAssistInvocationContext javaContext, IDocument document, ArrayList<ICompletionProposal> proposals) throws CoreException {
+	private void computeCompletionProposals(JavaContentAssistInvocationContext javaContext, IDocument document, ArrayList<ICompletionProposal> proposals) throws CoreException {
 		String content = document.get();
 		int offset = javaContext.getInvocationOffset();
 
@@ -207,8 +208,11 @@ public class ImgRefProposalComputer implements IJavaCompletionProposalComputer {
 		}
 
 		// search all source folders of the current project for images
-		for (IPackageFragmentRoot root : context.getProject().getPackageFragmentRoots()) {
-			final IResource rootResource = root.getResource();
+		for (IClasspathEntry entry : context.getProject().getResolvedClasspath(true)) {
+			if (entry.getEntryKind() != IClasspathEntry.CPE_SOURCE) {
+				continue;
+			}
+			final IResource rootResource = ResourcesPlugin.getWorkspace().getRoot().getFolder(entry.getPath());
 			if (rootResource == null) {
 				continue;
 			}
@@ -222,23 +226,12 @@ public class ImgRefProposalComputer implements IJavaCompletionProposalComputer {
 					if (imageResource instanceof IFile) {
 						if (imageResource.getName().endsWith(".png") && imageResource.getName().contains(prefix)) {
 							IPath imagePath = imageResource.getProjectRelativePath().makeRelativeTo(rootResource.getProjectRelativePath());
-							IPath relativePath = imagePath.makeRelativeTo(javaResourceParentPath);
-							int parentCount = 0;
-							while (parentCount < relativePath.segmentCount() && "..".equals(relativePath.segment(parentCount))) {
-								parentCount++;
-							}
-							String path;
-							if (parentCount > 1) {
-								path = "{@docRoot}/" + imagePath;
-							}
-							else {
-								path = relativePath.toString();
-							}
-							result.add(path);
+							result.add(UmletPluginUtils.calculateImageRef(javaResourceParentPath, imagePath));
 						}
 					}
 					return true;
 				}
+
 			});
 		}
 		return result;
