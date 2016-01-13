@@ -97,7 +97,7 @@ public class UmletBuilder extends IncrementalProjectBuilder {
 		if (file == null) {
 			return false;
 		}
-		return file.getName().endsWith(".uxf") && !file.isDerived(IResource.CHECK_ANCESTORS);
+		return file.getName().endsWith(".uxf") && !file.isDerived(IResource.CHECK_ANCESTORS) && file.exists();
 	}
 
 	private void processResources(List<IResource> resources, final IProgressMonitor monitor) {
