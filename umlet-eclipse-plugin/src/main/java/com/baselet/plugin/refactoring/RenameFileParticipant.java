@@ -1,7 +1,5 @@
 package com.baselet.plugin.refactoring;
 
-import java.util.Collections;
-
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -24,7 +22,7 @@ public class RenameFileParticipant extends RenameParticipant {
 
 	UpdateImgReferencesProcessor refProcessor;
 	RenamePngProcessor pngProcessor;
-	private IFile renamedFile;
+	private IFile origFile;
 
 	@Override
 	protected boolean initialize(Object element) {
@@ -32,16 +30,21 @@ public class RenameFileParticipant extends RenameParticipant {
 			return false;
 		}
 
-		renamedFile = (IFile) element;
+		origFile = (IFile) element;
+
+		if (!origFile.exists() || !"uxf".equals(origFile.getFileExtension())) {
+			return false;
+		}
 
 		refProcessor = new UpdateImgReferencesProcessor() {
 
 			@Override
-			protected IFile calculateDestination(IFile uxf, ICompilationUnit referencingCompilationUnit) {
-				if (!renamedFile.equals(uxf)) {
-					return null;
+			protected IFile calculateImgDestination(IFile img, ICompilationUnit referencingCompilationUnit) {
+				IFile uxfFile = UmletPluginUtils.getUxfDiagramForImgFile(img);
+				if (origFile.equals(uxfFile)) {
+					return origFile.getParent().getFile(new Path(getArguments().getNewName()).removeFileExtension().addFileExtension(img.getFileExtension()));
 				}
-				return renamedFile.getParent().getFile(new Path(getArguments().getNewName()));
+				return null;
 			}
 		};
 		pngProcessor = new RenamePngProcessor() {
@@ -52,7 +55,7 @@ public class RenameFileParticipant extends RenameParticipant {
 			}
 		};
 
-		return refProcessor.initialize(UmletPluginUtils.getJavaProject(renamedFile.getProject()));
+		return refProcessor.initialize(UmletPluginUtils.getJavaProject(origFile.getProject())) && pngProcessor.initialize(origFile);
 	}
 
 	@Override
@@ -69,7 +72,7 @@ public class RenameFileParticipant extends RenameParticipant {
 	public Change createChange(IProgressMonitor pm) throws CoreException, OperationCanceledException {
 		CompositeChange change = new CompositeChange("Umlet");
 		change.add(refProcessor.createChange(pm));
-		change.addAll(pngProcessor.createChange(Collections.singletonList(renamedFile)));
+		change.addAll(pngProcessor.createChange());
 		return change;
 	}
 

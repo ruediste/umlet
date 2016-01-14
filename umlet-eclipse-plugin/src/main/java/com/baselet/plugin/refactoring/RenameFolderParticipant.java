@@ -19,7 +19,9 @@ import org.eclipse.ltk.core.refactoring.participants.RenameParticipant;
 import com.baselet.plugin.UmletPluginUtils;
 
 /**
- * Participant updating img tags in JavaDocs when diagram resources are renamed
+ * Participant updating img tags in JavaDocs when a folder is renamed.
+ *
+ * <p> Does not take part in package renames, this is handled by the {@link RenamePackageParticipant}.
  */
 public class RenameFolderParticipant extends RenameParticipant {
 
@@ -41,19 +43,19 @@ public class RenameFolderParticipant extends RenameParticipant {
 
 		refProcessor = new UpdateImgReferencesProcessor() {
 			@Override
-			protected void calculateDestination(IFile uxf, ICompilationUnit referencingCompilationUnit, Destination dest) throws CoreException {
+			protected void calculateDestination(IFile img, ICompilationUnit referencingCompilationUnit, Destination dest) throws CoreException {
 				IResource cuResource = referencingCompilationUnit.getCorrespondingResource();
 				if (cuResource == null) {
 					return;
 				}
-				if (renamedFolderPath.isPrefixOf(uxf.getFullPath())) {
-					IPath relativePath = uxf.getFullPath().makeRelativeTo(renamedFolderPath);
-					dest.uxfFileDestination = newFolder.getFile(relativePath);
+				if (renamedFolderPath.isPrefixOf(img.getFullPath())) {
+					IPath relativePath = img.getFullPath().makeRelativeTo(renamedFolderPath);
+					dest.imgFileDestination = newFolder.getFile(relativePath);
 				}
 			}
 
 			@Override
-			protected IFile calculateDestination(IFile uxf, ICompilationUnit referencingCompilationUnit) throws JavaModelException {
+			protected IFile calculateImgDestination(IFile uxf, ICompilationUnit referencingCompilationUnit) throws JavaModelException {
 				throw new UnsupportedOperationException();
 			}
 

@@ -10,20 +10,21 @@ import org.eclipse.ltk.core.refactoring.resource.MoveResourceChange;
 
 public abstract class MovePngProcessor {
 
-	public boolean initialize() {
+	private IFile uxfDiagram;
+
+	public boolean initialize(IFile uxfDiagram) {
+		this.uxfDiagram = uxfDiagram;
 		return true;
 	}
 
-	public Change[] createChange(List<IFile> affectedDiagrams) {
+	public Change[] createChange() {
 		List<Change> result = new ArrayList<Change>();
-		for (IFile affectedDiagram : affectedDiagrams) {
-			// move img files with the diagram
-			IContainer parent = affectedDiagram.getParent();
-			if (parent != null) {
-				IFile pngFile = affectedDiagram.getProject().getFile(affectedDiagram.getProjectRelativePath().removeFileExtension().addFileExtension("png"));
-				if (pngFile.exists()) {
-					result.add(new MoveResourceChange(pngFile, getDestinationFolder(pngFile, affectedDiagram)));
-				}
+		// move img files with the diagram
+		IContainer parent = uxfDiagram.getParent();
+		if (parent != null) {
+			IFile pngFile = uxfDiagram.getProject().getFile(uxfDiagram.getProjectRelativePath().removeFileExtension().addFileExtension("png"));
+			if (pngFile.exists()) {
+				result.add(new MoveResourceChange(pngFile, getDestinationFolder(pngFile, uxfDiagram)));
 			}
 		}
 

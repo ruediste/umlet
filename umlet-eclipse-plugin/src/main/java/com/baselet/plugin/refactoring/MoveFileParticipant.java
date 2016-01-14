@@ -1,11 +1,8 @@
 package com.baselet.plugin.refactoring;
 
-import java.util.Collections;
-
 import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
-import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
@@ -20,21 +17,21 @@ import org.eclipse.ltk.core.refactoring.participants.MoveParticipant;
 import com.baselet.plugin.UmletPluginUtils;
 
 /**
- * Refactoring participant updating JavaDoc references to a diagram beeing moved
+ * Participant updating img tags in JavaDocs when a diagram file is moved.
  */
-public class MoveResourceParticipant extends MoveParticipant {
+public class MoveFileParticipant extends MoveParticipant {
 
 	private UpdateImgReferencesProcessor refprocessor;
 	private MovePngProcessor pngProcessor;
-	private IResource resource;
+	private IFile origFile;
 
 	@Override
 	protected boolean initialize(Object element) {
-		if (!(element instanceof IResource)) {
+		if (!(element instanceof IFile)) {
 			return false;
 		}
-		resource = (IResource) element;
-		if (!resource.exists() || !"uxf".equals(resource.getFileExtension())) {
+		origFile = (IFile) element;
+		if (!origFile.exists() || !"uxf".equals(origFile.getFileExtension())) {
 			return false;
 		}
 		final IFolder destinationFolder;
@@ -49,11 +46,12 @@ public class MoveResourceParticipant extends MoveParticipant {
 		refprocessor = new UpdateImgReferencesProcessor() {
 
 			@Override
-			protected IFile calculateDestination(IFile uxf, ICompilationUnit referencingCompilationUnit) {
-				if (!resource.equals(uxf)) {
-					return null;
+			protected IFile calculateImgDestination(IFile img, ICompilationUnit referencingCompilationUnit) {
+				IFile uxfFile = UmletPluginUtils.getUxfDiagramForImgFile(img);
+				if (origFile.equals(uxfFile)) {
+					return destinationFolder.getFile(img.getName());
 				}
-				return destinationFolder.getFile(uxf.getName());
+				return null;
 			}
 
 		};
@@ -66,7 +64,7 @@ public class MoveResourceParticipant extends MoveParticipant {
 			}
 		};
 
-		return refprocessor.initialize(UmletPluginUtils.getJavaProject(resource.getProject())) && pngProcessor.initialize();
+		return refprocessor.initialize(UmletPluginUtils.getJavaProject(origFile.getProject())) && pngProcessor.initialize(origFile);
 	}
 
 	@Override
@@ -83,7 +81,7 @@ public class MoveResourceParticipant extends MoveParticipant {
 	public Change createChange(IProgressMonitor pm) throws CoreException, OperationCanceledException {
 		CompositeChange change = new CompositeChange("Umlet");
 		change.add(refprocessor.createChange(pm));
-		change.addAll(pngProcessor.createChange(Collections.singletonList((IFile) resource)));
+		change.addAll(pngProcessor.createChange());
 		return change;
 	}
 

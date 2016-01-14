@@ -10,20 +10,21 @@ import org.eclipse.ltk.core.refactoring.resource.RenameResourceChange;
 
 public abstract class RenamePngProcessor {
 
-	public boolean initialize() {
+	private IFile affectedDiagram;
+
+	public boolean initialize(IFile affectedDiagram) {
+		this.affectedDiagram = affectedDiagram;
 		return true;
 	}
 
-	public Change[] createChange(List<IFile> affectedDiagrams) {
+	public Change[] createChange() {
 		List<Change> result = new ArrayList<Change>();
-		for (IFile affectedDiagram : affectedDiagrams) {
-			// rename img files with the diagram
-			IContainer parent = affectedDiagram.getParent();
-			if (parent != null) {
-				IFile pngFile = affectedDiagram.getProject().getFile(affectedDiagram.getProjectRelativePath().removeFileExtension().addFileExtension("png"));
-				if (pngFile.exists()) {
-					result.add(new RenameResourceChange(pngFile.getFullPath(), getTargetname(pngFile, affectedDiagram)));
-				}
+		// rename img files with the diagram
+		IContainer parent = affectedDiagram.getParent();
+		if (parent != null) {
+			IFile pngFile = affectedDiagram.getProject().getFile(affectedDiagram.getProjectRelativePath().removeFileExtension().addFileExtension("png"));
+			if (pngFile.exists()) {
+				result.add(new RenameResourceChange(pngFile.getFullPath(), getTargetname(pngFile, affectedDiagram)));
 			}
 		}
 

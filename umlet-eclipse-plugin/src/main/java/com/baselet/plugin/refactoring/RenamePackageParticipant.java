@@ -20,6 +20,9 @@ import org.eclipse.ltk.core.refactoring.participants.RenameParticipant;
 
 import com.baselet.plugin.UmletPluginUtils;
 
+/**
+ * Participant updating img tags in JavaDocs when a package is renamed.
+ */
 public class RenamePackageParticipant extends RenameParticipant {
 
 	IPackageFragment packageFragment;
@@ -60,16 +63,16 @@ public class RenamePackageParticipant extends RenameParticipant {
 		refProcessor = new UpdateImgReferencesProcessor() {
 
 			@Override
-			protected void calculateDestination(IFile uxf, ICompilationUnit referencingCompilationUnit, Destination dest) throws CoreException {
+			protected void calculateDestination(IFile img, ICompilationUnit referencingCompilationUnit, Destination dest) throws CoreException {
 				IResource cuResource = referencingCompilationUnit.getCorrespondingResource();
 				if (cuResource == null) {
 					return;
 				}
-				boolean uxfInFolder = renamedFolderPath.isPrefixOf(uxf.getFullPath());
+				boolean uxfInFolder = renamedFolderPath.isPrefixOf(img.getFullPath());
 				boolean cuInFolder = renamedFolderPath.isPrefixOf(cuResource.getFullPath());
 				if (uxfInFolder && !cuInFolder) {
-					IPath relativePath = uxf.getFullPath().makeRelativeTo(renamedFolderPath);
-					dest.uxfFileDestination = newPackageFragmentFolder.getFile(relativePath);
+					IPath relativePath = img.getFullPath().makeRelativeTo(renamedFolderPath);
+					dest.imgFileDestination = newPackageFragmentFolder.getFile(relativePath);
 				}
 				else if (!uxfInFolder && cuInFolder) {
 					IPath relativePath = cuResource.getFullPath().makeRelativeTo(renamedFolderPath);
@@ -78,7 +81,7 @@ public class RenamePackageParticipant extends RenameParticipant {
 			}
 
 			@Override
-			protected IFile calculateDestination(IFile uxf, ICompilationUnit referencingCompilationUnit) throws JavaModelException {
+			protected IFile calculateImgDestination(IFile uxf, ICompilationUnit referencingCompilationUnit) throws JavaModelException {
 				throw new UnsupportedOperationException();
 			}
 		};

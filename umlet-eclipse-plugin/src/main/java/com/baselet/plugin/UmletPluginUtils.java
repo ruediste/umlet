@@ -1,10 +1,12 @@
 package com.baselet.plugin;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
@@ -20,6 +22,12 @@ import org.eclipse.jdt.core.IParent;
 import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
+
+import com.baselet.plugin.refactoring.ImageReference;
+import com.baselet.plugin.refactoring.JavaDocParser;
+import com.baselet.plugin.refactoring.JavaDocParser.HtmlTagAttr;
+import com.baselet.plugin.refactoring.JavaDocParser.HtmlTagStartNode;
+import com.baselet.plugin.refactoring.JavaDocParser.JavaDocCommentNode;
 
 public class UmletPluginUtils {
 
@@ -63,9 +71,9 @@ public class UmletPluginUtils {
 	}
 
 	/**
-	 * Returns the package fragment root relative path for the given src
+	 * Returns the package fragment root relative path for the given image reference src attribute value
 	 */
-	public static IPath resolveImgRef(ICompilationUnit unit, String src) throws JavaModelException {
+	public static IPath getRootRelativePath(ICompilationUnit unit, String src) throws JavaModelException {
 		if (isAbsoluteImageRef(src)) {
 			return new Path(src.substring("{@docRoot}".length()));
 		}
@@ -74,13 +82,36 @@ public class UmletPluginUtils {
 		}
 	}
 
+	public static IFile findExistingFile(IJavaProject project, IPath rootRelativeImgPath) throws JavaModelException {
+		List<IFile> files = findExistingFiles(project, rootRelativeImgPath);
+		if (files.size() == 1) {
+			return files.get(0);
+		}
+		return null;
+	}
+
+	public static List<IFile> findExistingFiles(IJavaProject project, IPath rootRelativeImgPath) throws JavaModelException {
+		ArrayList<IFile> result = new ArrayList<IFile>();
+		for (IPackageFragmentRoot root : getSourcePackageFragmentRoots(project)) {
+			IResource res = root.getCorrespondingResource();
+			if (!(res instanceof IFolder)) {
+				continue;
+			}
+			IFile file = ((IFolder) res).getFile(rootRelativeImgPath);
+			if (file.exists()) {
+				result.add(file);
+			}
+		}
+		return result;
+	}
+
 	/**
 	 * Return the umlet diagram referenced by the given src attribute value in the given compilation unit.
 	 *
 	 * @return the corresponding umlet diagram corresponding or null, if no diagram could be found
 	 */
 	public static IFile findUmletDiagram(ICompilationUnit unit, String src) throws JavaModelException {
-		IPath imgRef = resolveImgRef(unit, src);
+		IPath imgRef = getRootRelativePath(unit, src);
 		return findUmletDiagram(unit.getJavaProject(), imgRef);
 	}
 
@@ -153,15 +184,22 @@ public class UmletPluginUtils {
 
 	public static List<ICompilationUnit> collectCompilationUnits(IJavaProject project) throws JavaModelException {
 		List<ICompilationUnit> compilationUnits = new ArrayList<ICompilationUnit>();
+		for (IPackageFragmentRoot root : getSourcePackageFragmentRoots(project)) {
+			collectCompilationUnits(root, compilationUnits);
+		}
+		return compilationUnits;
+	}
+
+	public static List<IPackageFragmentRoot> getSourcePackageFragmentRoots(IJavaProject project) throws JavaModelException {
+		List<IPackageFragmentRoot> roots = new ArrayList<IPackageFragmentRoot>();
+
 		for (IClasspathEntry entry : project.getResolvedClasspath(true)) {
 			if (entry.getEntryKind() != IClasspathEntry.CPE_SOURCE) {
 				continue;
 			}
-			for (IPackageFragmentRoot root : project.findPackageFragmentRoots(entry)) {
-				collectCompilationUnits(root, compilationUnits);
-			}
+			roots.addAll(Arrays.asList(project.findPackageFragmentRoots(entry)));
 		}
-		return compilationUnits;
+		return roots;
 	}
 
 	private static void collectCompilationUnits(IJavaElement element, List<ICompilationUnit> compilationUnits) throws JavaModelException {
@@ -197,5 +235,42 @@ public class UmletPluginUtils {
 			return (IPackageFragmentRoot) element;
 		}
 		return getPackageFragmentRoot(element.getParent());
+	}
+
+	public static IFile getUxfDiagramForImgFile(IFile img) {
+		return img.getProject().getFile(img.getProjectRelativePath().removeFileExtension().addFileExtension("uxf"));
+	}
+
+	public static List<ImageReference> collectImgRefs(ICompilationUnit cu) throws JavaModelException {
+		ArrayList<ImageReference> result = new ArrayList<ImageReference>();
+		// collect javadocs
+		List<ISourceRange> javadocRanges = UmletPluginUtils.collectJavadocRanges(cu);
+
+		String source = cu.getBuffer().getContents();
+		// parse javadocs and collect image references
+		for (ISourceRange javadocRange : javadocRanges) {
+			collectImgRefsImpl(result, source, javadocRange);
+		}
+		return result;
+	}
+
+	public static ArrayList<ImageReference> collectImgRefs(String source, ISourceRange javadocRange) {
+		ArrayList<ImageReference> result = new ArrayList<ImageReference>();
+		collectImgRefsImpl(result, source, javadocRange);
+		return result;
+	}
+
+	private static void collectImgRefsImpl(ArrayList<ImageReference> result, String source, ISourceRange javadocRange) {
+		JavaDocCommentNode comment = new JavaDocParser(source, javadocRange.getOffset(), javadocRange.getOffset() + javadocRange.getLength()).comment();
+		for (HtmlTagStartNode tag : comment.ofType(HtmlTagStartNode.class)) {
+			if (!"img".equals(tag.tagName.getValue())) {
+				continue;
+			}
+			HtmlTagAttr srcAttr = tag.getAttr("src");
+			if (srcAttr == null) {
+				continue;
+			}
+			result.add(new ImageReference(tag, srcAttr));
+		}
 	}
 }
