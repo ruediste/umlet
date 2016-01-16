@@ -150,15 +150,21 @@ public class UmletBuilder extends IncrementalProjectBuilder {
 			if (monitor != null) {
 				monitor.subTask("processing " + cu.getElementName());
 			}
-
 			try {
-				cu.getCorrespondingResource().deleteMarkers(IMG_MISSING_MARKER_TYPE, false, IResource.DEPTH_INFINITE);
+				if (!cu.exists()) {
+					continue;
+				}
+				IResource correspondingResource = cu.getCorrespondingResource();
+				if (correspondingResource == null) {
+					continue;
+				}
+				correspondingResource.deleteMarkers(IMG_MISSING_MARKER_TYPE, false, IResource.DEPTH_INFINITE);
 				for (ImageReference reference : UmletPluginUtils.collectImgRefs(cu)) {
 					SourceString srcAttrValue = reference.srcAttr.value;
 					IPath path = UmletPluginUtils.getRootRelativePath(cu, srcAttrValue.getValue());
 					List<IFile> files = UmletPluginUtils.findExistingFiles(cu.getJavaProject(), path);
 					if (files.isEmpty()) {
-						IMarker marker = cu.getCorrespondingResource().createMarker(IMG_MISSING_MARKER_TYPE);
+						IMarker marker = correspondingResource.createMarker(IMG_MISSING_MARKER_TYPE);
 						marker.setAttribute(IMarker.MESSAGE, "Unable to find referenced image " + path);
 						marker.setAttribute(IMarker.LOCATION, "JavaDoc");
 						marker.setAttribute(IMarker.CHAR_START, srcAttrValue.start);
@@ -168,9 +174,10 @@ public class UmletBuilder extends IncrementalProjectBuilder {
 				}
 			} catch (CoreException e) {
 				throw new RuntimeException(e);
-			}
-			if (monitor != null) {
-				monitor.worked(1);
+			} finally {
+				if (monitor != null) {
+					monitor.worked(1);
+				}
 			}
 		}
 		if (monitor != null) {

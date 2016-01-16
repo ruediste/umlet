@@ -4,16 +4,18 @@ import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
+import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.ltk.core.refactoring.Change;
+import org.eclipse.ltk.core.refactoring.IResourceMapper;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 import org.eclipse.ltk.core.refactoring.participants.CheckConditionsContext;
 import org.eclipse.ltk.core.refactoring.participants.RenameParticipant;
@@ -25,58 +27,49 @@ import com.baselet.plugin.UmletPluginUtils;
  */
 public class RenamePackageParticipant extends RenameParticipant {
 
-	IPackageFragment packageFragment;
-	UpdateImgReferencesProcessor refProcessor;
+	UmletRefactoringProcessorManager mgr = new UmletRefactoringProcessorManager();
 
 	@Override
 	protected boolean initialize(Object element) {
 		if (!(element instanceof IPackageFragment)) {
 			return false;
 		}
-		packageFragment = (IPackageFragment) element;
+		IPackageFragment packageFragment = (IPackageFragment) element;
 		IJavaProject javaProject = packageFragment.getJavaProject();
+		if (javaProject == null) {
+			return false;
+		}
 		final IPackageFragmentRoot packageFragmentRoot = UmletPluginUtils.getPackageFragmentRoot(packageFragment);
 		if (packageFragmentRoot == null) {
 			return false;
 		}
-		final IFolder packageFragmentFolder;
-		final IFolder newPackageFragmentFolder;
-		try {
-			IResource resource;
-
-			resource = packageFragment.getCorrespondingResource();
-			if (!(resource instanceof IFolder)) {
-				return false;
-			}
-			packageFragmentFolder = (IFolder) resource;
-
-			IResource pfrResource = packageFragmentRoot.getCorrespondingResource();
-			if (!(pfrResource instanceof IFolder)) {
-				return false;
-			}
-			newPackageFragmentFolder = ((IFolder) pfrResource).getFolder(getArguments().getNewName().replace('.', '/'));
-		} catch (JavaModelException e) {
+		if (!(getProcessor() instanceof IResourceMapper)) {
 			return false;
 		}
-		final IPath renamedFolderPath = packageFragmentFolder.getFullPath();
+		final IResourceMapper resourceMapper = (IResourceMapper) getProcessor();
 
-		refProcessor = new UpdateImgReferencesProcessor() {
+		mgr.add(new UpdateImgReferencesProcessor(javaProject) {
 
 			@Override
 			protected void calculateDestination(IFile img, ICompilationUnit referencingCompilationUnit, Destination dest) throws CoreException {
-				IResource cuResource = referencingCompilationUnit.getCorrespondingResource();
-				if (cuResource == null) {
-					return;
+				dest.cuDestination = (IFile) resourceMapper.getRefactoredResource(referencingCompilationUnit.getCorrespondingResource());
+
+				// Search the first parent resource of the file which has a corresponding java element.
+				// Must be a package or the root.
+				IJavaElement parentElement;
+				IResource parent;
+				{
+					parent = img;
+					do {
+						parent = parent.getParent();
+						parentElement = JavaCore.create(parent);
+					} while (parentElement == null && parent != null);
 				}
-				boolean uxfInFolder = renamedFolderPath.isPrefixOf(img.getFullPath());
-				boolean cuInFolder = renamedFolderPath.isPrefixOf(cuResource.getFullPath());
-				if (uxfInFolder && !cuInFolder) {
-					IPath relativePath = img.getFullPath().makeRelativeTo(renamedFolderPath);
-					dest.imgFileDestination = newPackageFragmentFolder.getFile(relativePath);
-				}
-				else if (!uxfInFolder && cuInFolder) {
-					IPath relativePath = cuResource.getFullPath().makeRelativeTo(renamedFolderPath);
-					dest.cuDestination = newPackageFragmentFolder.getFile(relativePath);
+				if (parentElement != null && parent != null) {
+					IResource refactoredParent = resourceMapper.getRefactoredResource(parent);
+					if (refactoredParent instanceof IFolder) {
+						dest.imgFileDestination = ((IFolder) refactoredParent).getFile(img.getFullPath().makeRelativeTo(parent.getFullPath()));
+					}
 				}
 			}
 
@@ -84,9 +77,9 @@ public class RenamePackageParticipant extends RenameParticipant {
 			protected IFile calculateImgDestination(IFile uxf, ICompilationUnit referencingCompilationUnit) throws JavaModelException {
 				throw new UnsupportedOperationException();
 			}
-		};
+		});
 
-		return refProcessor.initialize(javaProject);
+		return true;
 	}
 
 	@Override
@@ -101,7 +94,7 @@ public class RenamePackageParticipant extends RenameParticipant {
 
 	@Override
 	public Change createPreChange(IProgressMonitor pm) throws CoreException, OperationCanceledException {
-		return refProcessor.createChange(pm);
+		return mgr.createChange(pm);
 	}
 
 	@Override

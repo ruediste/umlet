@@ -1,5 +1,8 @@
 package com.baselet.plugin.refactoring;
 
+import java.util.Collections;
+import java.util.List;
+
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
@@ -18,24 +21,24 @@ import com.baselet.plugin.UmletPluginUtils;
  * Processor used by multiple refactoring participants to update image references
  * in JavaDoc comments.
  */
-public abstract class UpdateImgReferencesProcessor {
+public abstract class UpdateImgReferencesProcessor implements UmletRefactoringProcessor {
 
-	private IJavaProject project;
+	private final IJavaProject project;
 
 	protected static class Destination {
 		IFile cuDestination;
 		IFile imgFileDestination;
 	}
 
-	public boolean initialize(IJavaProject project) {
+	public UpdateImgReferencesProcessor(IJavaProject project) {
 		if (project == null) {
-			return false;
+			throw new IllegalArgumentException("project may not be null");
 		}
 		this.project = project;
-		return true;
 	}
 
-	public Change createChange(IProgressMonitor pm) throws CoreException {
+	@Override
+	public List<? extends Change> createChange(IProgressMonitor pm) throws CoreException {
 		// calculate target location
 
 		CompositeChange imgRefChange = new CompositeChange("Update <img> references");
@@ -55,6 +58,9 @@ public abstract class UpdateImgReferencesProcessor {
 			for (ImageReference reference : UmletPluginUtils.collectImgRefs(cu)) {
 				IPath originalImgPath = UmletPluginUtils.getRootRelativePath(cu, reference.srcAttr.value.getValue());
 				IFile originalImg = UmletPluginUtils.findExistingFile(project, originalImgPath);
+				if (originalImg == null) {
+					continue;
+				}
 
 				Destination dest = new Destination();
 
@@ -81,9 +87,9 @@ public abstract class UpdateImgReferencesProcessor {
 			}
 		}
 		if (imgRefChange.getChildren().length == 0) {
-			return null;
+			return Collections.emptyList();
 		}
-		return imgRefChange;
+		return Collections.singletonList(imgRefChange);
 	}
 
 	/**

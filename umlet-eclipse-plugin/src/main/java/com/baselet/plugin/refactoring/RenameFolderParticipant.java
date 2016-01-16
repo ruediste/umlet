@@ -10,6 +10,7 @@ import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
@@ -25,7 +26,7 @@ import com.baselet.plugin.UmletPluginUtils;
  */
 public class RenameFolderParticipant extends RenameParticipant {
 
-	UpdateImgReferencesProcessor refProcessor;
+	UmletRefactoringProcessorManager mgr = new UmletRefactoringProcessorManager();
 	private IFolder renamedFolder;
 
 	@Override
@@ -40,8 +41,12 @@ public class RenameFolderParticipant extends RenameParticipant {
 		renamedFolder = (IFolder) element;
 		final IPath renamedFolderPath = renamedFolder.getFullPath();
 		final IFolder newFolder = renamedFolder.getParent().getFolder(new Path(getArguments().getNewName()));
+		IJavaProject javaProject = UmletPluginUtils.getJavaProject(renamedFolder.getProject());
+		if (javaProject == null) {
+			return false;
+		}
 
-		refProcessor = new UpdateImgReferencesProcessor() {
+		mgr.add(new UpdateImgReferencesProcessor(javaProject) {
 			@Override
 			protected void calculateDestination(IFile img, ICompilationUnit referencingCompilationUnit, Destination dest) throws CoreException {
 				IResource cuResource = referencingCompilationUnit.getCorrespondingResource();
@@ -59,9 +64,9 @@ public class RenameFolderParticipant extends RenameParticipant {
 				throw new UnsupportedOperationException();
 			}
 
-		};
+		});
 
-		return refProcessor.initialize(UmletPluginUtils.getJavaProject(renamedFolder.getProject()));
+		return true;
 	}
 
 	@Override
@@ -76,7 +81,7 @@ public class RenameFolderParticipant extends RenameParticipant {
 
 	@Override
 	public Change createChange(IProgressMonitor pm) throws CoreException, OperationCanceledException {
-		return refProcessor.createChange(pm);
+		return mgr.createChange(pm);
 	}
 
 }

@@ -7,8 +7,8 @@ import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.ltk.core.refactoring.Change;
-import org.eclipse.ltk.core.refactoring.CompositeChange;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 import org.eclipse.ltk.core.refactoring.participants.CheckConditionsContext;
 import org.eclipse.ltk.core.refactoring.participants.RenameParticipant;
@@ -20,8 +20,7 @@ import com.baselet.plugin.UmletPluginUtils;
  */
 public class RenameFileParticipant extends RenameParticipant {
 
-	UpdateImgReferencesProcessor refProcessor;
-	RenamePngProcessor pngProcessor;
+	UmletRefactoringProcessorManager mgr = new UmletRefactoringProcessorManager();
 	private IFile origFile;
 
 	@Override
@@ -35,8 +34,12 @@ public class RenameFileParticipant extends RenameParticipant {
 		if (!origFile.exists() || !"uxf".equals(origFile.getFileExtension())) {
 			return false;
 		}
+		IJavaProject javaProject = UmletPluginUtils.getJavaProject(origFile.getProject());
+		if (javaProject == null) {
+			return false;
+		}
 
-		refProcessor = new UpdateImgReferencesProcessor() {
+		mgr.add(new UpdateImgReferencesProcessor(javaProject) {
 
 			@Override
 			protected IFile calculateImgDestination(IFile img, ICompilationUnit referencingCompilationUnit) {
@@ -46,16 +49,16 @@ public class RenameFileParticipant extends RenameParticipant {
 				}
 				return null;
 			}
-		};
-		pngProcessor = new RenamePngProcessor() {
+		});
+		mgr.add(new RenamePngProcessor(origFile) {
 
 			@Override
 			protected String getTargetname(IFile pngFile, IFile affectedDiagram) {
 				return new Path(getArguments().getNewName()).removeFileExtension().addFileExtension(pngFile.getFileExtension()).lastSegment();
 			}
-		};
+		});
 
-		return refProcessor.initialize(UmletPluginUtils.getJavaProject(origFile.getProject())) && pngProcessor.initialize(origFile);
+		return true;
 	}
 
 	@Override
@@ -70,10 +73,7 @@ public class RenameFileParticipant extends RenameParticipant {
 
 	@Override
 	public Change createChange(IProgressMonitor pm) throws CoreException, OperationCanceledException {
-		CompositeChange change = new CompositeChange("Umlet");
-		change.add(refProcessor.createChange(pm));
-		change.addAll(pngProcessor.createChange());
-		return change;
+		return mgr.createChange(pm);
 	}
 
 }

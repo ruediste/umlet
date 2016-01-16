@@ -5,19 +5,21 @@ import java.util.List;
 
 import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.resource.RenameResourceChange;
 
-public abstract class RenamePngProcessor {
+public abstract class RenamePngProcessor implements UmletRefactoringProcessor {
 
-	private IFile affectedDiagram;
+	private final IFile affectedDiagram;
 
-	public boolean initialize(IFile affectedDiagram) {
+	public RenamePngProcessor(IFile affectedDiagram) {
 		this.affectedDiagram = affectedDiagram;
-		return true;
 	}
 
-	public Change[] createChange() {
+	@Override
+	public List<? extends Change> createChange(IProgressMonitor monitor) throws CoreException {
 		List<Change> result = new ArrayList<Change>();
 		// rename img files with the diagram
 		IContainer parent = affectedDiagram.getParent();
@@ -27,8 +29,7 @@ public abstract class RenamePngProcessor {
 				result.add(new RenameResourceChange(pngFile.getFullPath(), getTargetname(pngFile, affectedDiagram)));
 			}
 		}
-
-		return result.toArray(new Change[] {});
+		return result;
 	}
 
 	protected abstract String getTargetname(IFile pngFile, IFile affectedDiagram);

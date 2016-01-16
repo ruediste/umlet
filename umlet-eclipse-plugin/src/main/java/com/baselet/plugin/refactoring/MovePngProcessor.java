@@ -5,19 +5,29 @@ import java.util.List;
 
 import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
+import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.resource.MoveResourceChange;
 
-public abstract class MovePngProcessor {
+public abstract class MovePngProcessor implements UmletRefactoringProcessor {
 
 	private IFile uxfDiagram;
 
-	public boolean initialize(IFile uxfDiagram) {
+	@Deprecated
+
+	public MovePngProcessor() {}
+
+	public MovePngProcessor(IFile uxfDiagram) {
 		this.uxfDiagram = uxfDiagram;
+	}
+
+	@Deprecated
+	public boolean initialize(IFile uxfDiagram) {
 		return true;
 	}
 
-	public Change[] createChange() {
+	@Override
+	public List<Change> createChange(IProgressMonitor pm) {
 		List<Change> result = new ArrayList<Change>();
 		// move img files with the diagram
 		IContainer parent = uxfDiagram.getParent();
@@ -28,7 +38,7 @@ public abstract class MovePngProcessor {
 			}
 		}
 
-		return result.toArray(new Change[] {});
+		return result;
 	}
 
 	protected abstract IContainer getDestinationFolder(IFile pngFile, IFile affectedDiagram);
