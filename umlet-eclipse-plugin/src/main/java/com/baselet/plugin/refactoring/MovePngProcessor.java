@@ -11,19 +11,10 @@ import org.eclipse.ltk.core.refactoring.resource.MoveResourceChange;
 
 public abstract class MovePngProcessor implements UmletRefactoringProcessor {
 
-	private IFile uxfDiagram;
-
-	@Deprecated
-
-	public MovePngProcessor() {}
+	private final IFile uxfDiagram;
 
 	public MovePngProcessor(IFile uxfDiagram) {
 		this.uxfDiagram = uxfDiagram;
-	}
-
-	@Deprecated
-	public boolean initialize(IFile uxfDiagram) {
-		return true;
 	}
 
 	@Override
@@ -34,7 +25,10 @@ public abstract class MovePngProcessor implements UmletRefactoringProcessor {
 		if (parent != null) {
 			IFile pngFile = uxfDiagram.getProject().getFile(uxfDiagram.getProjectRelativePath().removeFileExtension().addFileExtension("png"));
 			if (pngFile.exists()) {
-				result.add(new MoveResourceChange(pngFile, getDestinationFolder(pngFile, uxfDiagram)));
+				IContainer destinationFolder = getDestinationFolder(pngFile, uxfDiagram);
+				if (destinationFolder != null) {
+					result.add(new MoveResourceChange(pngFile, destinationFolder));
+				}
 			}
 		}
 
